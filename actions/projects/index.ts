@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/config/db"
+import { revalidatePath } from "next/cache"
 import { generateUniqueSlug } from "@/lib/utils/slug"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/config/auth"
@@ -252,14 +253,19 @@ export async function updateProject(slug: string, formData: FormData): Promise<P
 
   const project = await prisma.project.findUnique({
     where: { slug },
+    select: { id: true, userId: true, status: true, title: true, objectives: true, justification: true, scope: true },
   })
 
   if (!project) throw new Error("Project not found")
+  if (project.status !== ProjectStatus.DRAFT && project.status !== (ProjectStatus as any).RETURNED) {
+    throw new Error("Only projects in DRAFT or RETURNED status can be edited")
+  }
+
   if (project.userId !== session.user.id) {
     throw new Error("Unauthorized access to project")
   }
 
-  return prisma.project.update({
+  const updated = await prisma.project.update({
     where: { slug },
     data: {
       title: titulo,
@@ -268,6 +274,11 @@ export async function updateProject(slug: string, formData: FormData): Promise<P
       scope: abrangencia,
     },
   })
+
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
+
+  return updated
 }
 
 export async function getProjectViewerContext(slug: string): Promise<ProjectViewerContext> {
@@ -355,9 +366,54 @@ export async function submitProjectForApproval(slug: string): Promise<Project> {
       where: { slug },
       include: { user: { select: { name: true } } },
     })
+
     if (full) {
+      // 1. Notify General Admins
       await NotificationService.notifyAdminsOfNewSubmission({ id: full.id, title: full.title, slug: full.slug!, user: { name: full.user?.name } })
-      await logProjectAction(full.id, "SUBMITTED", session.user.id, { fromStatus: project.status, toStatus: "PENDING_REVIEW" })
+
+      // 2. Notify Previous Reviewer (Granular)
+      // If the project was returned and has a reviewer assigned, notify them specifically
+      if (project.status === (ProjectStatus as any).RETURNED && project.reviewStartedBy) {
+        await NotificationService.notifyUser(project.reviewStartedBy, "Projeto Reenviado", `O projeto "${full.title}" foi corrigido e reenviado para análise.`, `/admin/projetos/${full.slug}/review`, {
+          key: "PROJECT_SUBMITTED",
+          vars: {
+            projectTitle: full.title,
+            submitterName: full.user?.name || "Usuário",
+            reviewUrl: `${process.env.NEXT_PUBLIC_APP_URL}/admin/projetos/${full.slug}/review`,
+          },
+        })
+      }
+
+      // Smart Audit: Calculate Diff if resubmitting
+      let diff = undefined
+      if (project.status === (ProjectStatus as any).RETURNED) {
+        const lastReturn = await prisma.projectAudit.findFirst({
+          where: { projectId: full.id, action: "RETURNED" },
+          orderBy: { createdAt: "desc" },
+        })
+
+        if (lastReturn?.changeDetails && (lastReturn.changeDetails as any).snapshot) {
+          const snapshot = (lastReturn.changeDetails as any).snapshot
+          const current = {
+            title: full.title,
+            objectives: full.objectives,
+            justification: full.justification,
+            scope: full.scope,
+          }
+
+          const calculatedDiff: Record<string, { from: string; to: string }> = {}
+          if (snapshot.title !== current.title) calculatedDiff.title = { from: snapshot.title, to: current.title }
+          if (snapshot.objectives !== current.objectives) calculatedDiff.objectives = { from: snapshot.objectives, to: current.objectives }
+          if (snapshot.justification !== current.justification) calculatedDiff.justification = { from: snapshot.justification, to: current.justification }
+          if (snapshot.scope !== current.scope) calculatedDiff.scope = { from: snapshot.scope, to: current.scope }
+
+          if (Object.keys(calculatedDiff).length > 0) {
+            diff = calculatedDiff
+          }
+        }
+      }
+
+      await logProjectAction(full.id, "SUBMITTED", session.user.id, { fromStatus: project.status, toStatus: "PENDING_REVIEW", diff })
     }
   } catch (e) {
     console.error("notify/log submitProjectForApproval error", e)
@@ -404,6 +460,9 @@ export async function startProjectReview(slug: string): Promise<Project> {
     console.error("log startProjectReview error", e)
   }
 
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
+
   return updated
 }
 
@@ -416,7 +475,7 @@ export async function approveProject(slug: string, opinion?: string): Promise<Pr
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { id: true, status: true },
+    select: { id: true, status: true, userId: true, reviewStartedBy: true },
   })
 
   if (!project) throw new Error("Project not found")
@@ -427,6 +486,17 @@ export async function approveProject(slug: string, opinion?: string): Promise<Pr
 
   if (project.status !== ProjectStatus.UNDER_REVIEW) {
     throw new Error("Only projects under review can be approved")
+  }
+
+  // Business Rule: Prevent self-approval
+  if (project.userId === session.user.id) {
+    throw new Error("You cannot approve your own project")
+  }
+
+  // Business Rule: Reviewer exclusivity
+  // Only the person who started the review can approve it, unless there is no reviewer explicitly set (legacy compat)
+  if (project.reviewStartedBy && project.reviewStartedBy !== session.user.id) {
+    throw new Error("This project is under review by another administrator")
   }
 
   const updated = await prisma.project.update({
@@ -454,6 +524,9 @@ export async function approveProject(slug: string, opinion?: string): Promise<Pr
     console.error("notify/log approveProject error", e)
   }
 
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
+
   return updated
 }
 
@@ -470,13 +543,18 @@ export async function rejectProject(slug: string, reason: string): Promise<Proje
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { id: true, status: true },
+    select: { id: true, status: true, reviewStartedBy: true, userId: true },
   })
 
   if (!project) throw new Error("Project not found")
 
   if (project.status !== ProjectStatus.UNDER_REVIEW) {
     throw new Error("Only projects under review can be rejected")
+  }
+
+  // Business Rule: Reviewer exclusivity
+  if (project.reviewStartedBy && project.reviewStartedBy !== session.user.id) {
+    throw new Error("This project is under review by another administrator")
   }
 
   const updated = await prisma.project.update({
@@ -502,6 +580,9 @@ export async function rejectProject(slug: string, reason: string): Promise<Proje
     console.error("notify/log rejectProject error", e)
   }
 
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
+
   return updated
 }
 
@@ -518,13 +599,18 @@ export async function requestProjectAdjustments(slug: string, reason: string): P
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { id: true, status: true },
+    select: { id: true, status: true, reviewStartedBy: true, userId: true, title: true, objectives: true, justification: true, scope: true },
   })
 
   if (!project) throw new Error("Project not found")
 
   if (project.status !== ProjectStatus.UNDER_REVIEW) {
     throw new Error("Somente projetos em analise podem ser retornados para ajustes")
+  }
+
+  // Business Rule: Reviewer exclusivity
+  if (project.reviewStartedBy && project.reviewStartedBy !== session.user.id) {
+    throw new Error("This project is under review by another administrator")
   }
 
   const updated = await prisma.project.update({
@@ -544,11 +630,23 @@ export async function requestProjectAdjustments(slug: string, reason: string): P
     })
     if (full) {
       await NotificationService.notifyUserOfAdjustments({ title: full.title, slug: full.slug!, userId: full.userId, user: { email: full.user?.email } }, reason, { name: session.user.name })
-      await logProjectAction(full.id, "RETURNED", session.user.id, { reason, toStatus: ProjectStatus.RETURNED })
+
+      // Smart Audit: Snapshot current state to compare later
+      const snapshot = {
+        title: project.title,
+        objectives: project.objectives,
+        justification: project.justification,
+        scope: project.scope,
+      }
+
+      await logProjectAction(full.id, "RETURNED", session.user.id, { reason, toStatus: ProjectStatus.RETURNED, snapshot })
     }
   } catch (e) {
     console.error("notify/log requestProjectAdjustments error", e)
   }
+
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
 
   return updated
 }
@@ -848,4 +946,113 @@ export async function getUserProjectStats(): Promise<GetUserProjectStatsResponse
     totalPendingInSystem,
     totalGlobal,
   }
+}
+
+export async function releaseProjectReview(slug: string): Promise<Project> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) throw new Error("Unauthorized")
+
+  // Verify has specific management permission
+  await PermissionsService.authorize(session.user.id, { slug: "projects.manage.reviews" })
+
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, status: true, reviewStartedBy: true },
+  })
+
+  if (!project) throw new Error("Project not found")
+
+  if (project.status !== ProjectStatus.UNDER_REVIEW) {
+    throw new Error("Only projects under review can be released")
+  }
+
+  const updated = await prisma.project.update({
+    where: { slug },
+    data: {
+      status: "PENDING_REVIEW",
+      reviewStartedBy: null,
+      reviewStartedAt: null,
+      statusUpdatedAt: new Date(),
+    },
+  })
+
+  // Log audit
+  try {
+    await logProjectAction(project.id, "REVIEW_RELEASED", session.user.id, {
+      fromStatus: "UNDER_REVIEW",
+      toStatus: "PENDING_REVIEW",
+      releasedFrom: project.reviewStartedBy,
+    })
+  } catch (e) {
+    console.error("log releaseProjectReview error", e)
+  }
+
+  revalidatePath(`/admin/projetos/${slug}/review`)
+  revalidatePath("/admin/projetos")
+
+  return updated
+}
+
+export async function retractProjectSubmission(slug: string): Promise<Project> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) throw new Error("Unauthorized")
+
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, status: true, userId: true },
+  })
+
+  if (!project) throw new Error("Project not found")
+
+  if (project.userId !== session.user.id) {
+    throw new Error("Unauthorized - only project owner can retract submission")
+  }
+
+  if (project.status !== ProjectStatus.PENDING_REVIEW) {
+    throw new Error("Only pending reviews can be retracted")
+  }
+
+  const updated = await prisma.project.update({
+    where: { slug },
+    data: {
+      status: ProjectStatus.DRAFT,
+      submittedAt: null,
+      statusUpdatedAt: new Date(),
+    },
+  })
+
+  try {
+    await logProjectAction(project.id, "RETRACTED", session.user.id, { fromStatus: "PENDING_REVIEW", toStatus: "DRAFT" })
+  } catch (e) {
+    console.error("log retractProjectSubmission error", e)
+  }
+
+  revalidatePath("/projetos")
+  return updated
+}
+
+export async function deleteProject(slug: string): Promise<void> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) throw new Error("Unauthorized")
+
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, status: true, userId: true },
+  })
+
+  if (!project) throw new Error("Project not found")
+
+  if (project.userId !== session.user.id) {
+    throw new Error("Unauthorized - only project owner can delete")
+  }
+
+  if (project.status !== ProjectStatus.DRAFT) {
+    throw new Error("Only draft projects can be deleted")
+  }
+
+  await prisma.project.delete({
+    where: { slug },
+  })
+
+  revalidatePath("/projetos")
 }

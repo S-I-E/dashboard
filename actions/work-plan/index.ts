@@ -2,11 +2,8 @@
 
 import { prisma } from "@/lib/config/db"
 import { type WorkPlanFormData } from "@/lib/schemas/work-plan"
-import {
-  workPlanValidator,
-  GetWorkPlanResponse,
-  UpsertWorkPlanResponse,
-} from "./types"
+import { ProjectStatus } from "@prisma/client"
+import { workPlanValidator, GetWorkPlanResponse, UpsertWorkPlanResponse } from "./types"
 import { revalidatePath } from "next/cache"
 
 export async function getWorkPlan(projectId: string): Promise<GetWorkPlanResponse | null> {
@@ -45,6 +42,19 @@ export async function getWorkPlan(projectId: string): Promise<GetWorkPlanRespons
 
 export async function upsertWorkPlan(projectId: string, data: WorkPlanFormData): Promise<UpsertWorkPlanResponse> {
   try {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { status: true },
+    })
+
+    if (!project) {
+      return { success: false, error: "Project not found" }
+    }
+
+    if (project.status !== ProjectStatus.DRAFT && project.status !== (ProjectStatus as any).RETURNED) {
+      return { success: false, error: "Project is locked for editing" }
+    }
+
     const workPlan = await prisma.workPlan.upsert({
       where: { projectId },
       create: {
