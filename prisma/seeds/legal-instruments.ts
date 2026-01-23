@@ -70,7 +70,25 @@ export async function seedLegalInstruments(prisma: PrismaClient) {
       select: { id: true },
     })
 
-    if (existing) continue
+    if (existing) {
+      const version = await prisma.legalInstrumentVersion.findFirst({
+        where: { legalInstrumentId: existing.id },
+      })
+      if (!version) {
+        const templateFileId = instrument.type === LegalInstrumentType.NDA ? docxFile.id : pdfFile.id
+        await prisma.legalInstrumentVersion.create({
+          data: {
+            legalInstrumentId: existing.id,
+            version: 1,
+            revisionKey: crypto.randomUUID(),
+            type: instrument.type,
+            fieldsJson: defaultFieldsJson as any,
+            templateFileId,
+          },
+        })
+      }
+      continue
+    }
 
     const templateFileId = instrument.type === LegalInstrumentType.NDA ? docxFile.id : pdfFile.id
 
@@ -81,6 +99,15 @@ export async function seedLegalInstruments(prisma: PrismaClient) {
         type: instrument.type,
         fieldsJson: defaultFieldsJson as any,
         templateFileId,
+        versions: {
+          create: {
+            version: 1,
+            revisionKey: crypto.randomUUID(),
+            type: instrument.type,
+            fieldsJson: defaultFieldsJson as any,
+            templateFileId,
+          },
+        },
       },
     })
   }

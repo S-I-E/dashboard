@@ -27,6 +27,7 @@ import type { LegalInstrumentFieldSpec } from "@/types/legal-instrument"
 import { legalInstrumentTypeLabel } from "@/lib/utils/legal-instrument"
 import { ProjectStatusBadge } from "@/components/projects/status-badge"
 import { ExportPdfButton } from "@/components/projects/export-pdf-button"
+import { ScheduleManager } from "@/components/projects/schedule/schedule-manager"
 
 type MissingDependency = {
   id: string
@@ -530,7 +531,7 @@ export default function ProjectDetailsPage() {
                   </CardContent>
                 </Card>
 
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid gap-6">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">Equipe Executora</CardTitle>
@@ -547,21 +548,9 @@ export default function ProjectDetailsPage() {
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Cronograma</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col items-center justify-center py-6 text-center space-y-2">
-                        <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-                        {view?.allowActions && (
-                          <Button variant="link" size="sm" asChild>
-                            <Link href={`/projetos/${project.slug}/work-plan`}>Ver Cronograma</Link>
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="space-y-6">
+                    <ScheduleManager projectId={project.id} readOnly={!view?.allowActions || (project.status !== ProjectStatus.DRAFT && (project.status as any) !== "RETURNED")} />
+                  </div>
                 </div>
               </div>
             ) : (

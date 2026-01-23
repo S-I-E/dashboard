@@ -6,6 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "./client"
 }
 
 datasource db {
@@ -63,6 +64,19 @@ enum ProjectStatus {
   RETURNED
 }
 
+enum TaskStatus {
+  TODO
+  DOING
+  DONE
+  BLOCKED
+}
+
+enum MilestoneStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+}
+
 model Project {
   id            String  @id @default(uuid())
   slug          String? @unique
@@ -102,6 +116,8 @@ model Project {
 
   legalInstrumentInstance LegalInstrumentInstance?
   audits                  ProjectAudit[]
+
+  schedule ProjectSchedule?
 
   @@index([userId])
   @@index([approvedBy])
@@ -158,6 +174,77 @@ model ScheduleItem {
   status      ScheduleStatus @default(PLANNED)
 
   @@index([workPlanId])
+}
+
+model ProjectSchedule {
+  id        String  @id @default(uuid())
+  projectId String  @unique
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  milestones Milestone[]
+  tasks      Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Milestone {
+  id         String          @id @default(uuid())
+  scheduleId String
+  schedule   ProjectSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+  order       Int     @default(0)
+
+  startDate DateTime?
+  endDate   DateTime?
+  status    MilestoneStatus @default(PLANNED)
+
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scheduleId])
+}
+
+model Task {
+  id         String          @id @default(uuid())
+  scheduleId String
+  schedule   ProjectSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  milestoneId String?
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  title         String
+  description   String?    @db.Text
+  status        TaskStatus @default(TODO)
+  priority      Int        @default(0)
+  estimatedTime Int? // In minutes
+
+  startDate     DateTime?
+  dueDate       DateTime?
+  blockedReason String?   @db.Text
+
+  dependencies TaskDependency[] @relation("TaskToDependency")
+  dependedBy   TaskDependency[] @relation("DependencyToTask")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scheduleId])
+  @@index([milestoneId])
+}
+
+model TaskDependency {
+  taskId          String
+  dependsOnTaskId String
+
+  task          Task @relation("TaskToDependency", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask Task @relation("DependencyToTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, dependsOnTaskId])
 }
 
 model TeamMember {

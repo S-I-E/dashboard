@@ -22,8 +22,8 @@ import { ProjectStatus, LegalInstrumentType } from "@prisma/client"
 import { PageHeader, PageShell, PageBack, PageHeaderHeading } from "@/components/shell"
 import { ProjectStatusBadge } from "@/components/projects/status-badge"
 import { Separator } from "@/components/ui/separator"
+import { ScheduleManager } from "@/components/projects/schedule/schedule-manager"
 
-import { RejectProjectDialog } from "@/components/admin/projects/review/reject-project-dialog"
 import { ReturnProjectDialog } from "@/components/admin/projects/review/return-project-dialog"
 import { ApproveProjectDialog } from "@/components/admin/projects/review/approve-project-dialog"
 
@@ -153,7 +153,6 @@ export default function ProjectReviewPage() {
 
               {project.status === ProjectStatus.UNDER_REVIEW && (
                 <>
-                  <RejectProjectDialog slug={slug} />
                   <ReturnProjectDialog slug={slug} />
                   <ApproveProjectDialog slug={slug} />
                 </>
@@ -411,6 +410,11 @@ export default function ProjectReviewPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Technical Schedule (Milestones & Tasks) */}
+              <div className="pt-6 border-t">
+                <ScheduleManager projectId={project.id} readOnly />
+              </div>
 
               {/* Team & Participants */}
               <div className="grid gap-6 md:grid-cols-2">

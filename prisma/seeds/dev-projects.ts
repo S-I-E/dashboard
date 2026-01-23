@@ -1,7 +1,7 @@
-import { PrismaClient, ProjectStatus, LegalInstrumentStatus } from "../client"
+import { PrismaClient, ProjectStatus, LegalInstrumentStatus, LegalInstrumentType } from "../client"
 
 export async function seedDevProjects(prisma: PrismaClient) {
-  console.log("Seeding Development Projects for 'teste'...")
+  console.log("Seeding Dev Projects for 'teste'...")
 
   const user = await prisma.user.findUnique({
     where: { email: "teste@ufr.edu.br" },
@@ -26,8 +26,19 @@ export async function seedDevProjects(prisma: PrismaClient) {
     const daysAgo = Math.floor(Math.random() * 180) // Last 6 months
     const createdAt = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
 
+    const instrumentTypes = Object.values(LegalInstrumentType)
+    const proposedInstrumentType = instrumentTypes[Math.floor(Math.random() * instrumentTypes.length)]
+
     // Some projects have submittedAt, others don't (if DRAFT)
     const submittedAt = status !== ProjectStatus.DRAFT ? new Date(createdAt.getTime() + 1000 * 60 * 60 * 2) : null
+
+    let approvalOpinion = null
+    if (status === ProjectStatus.APPROVED) {
+      approvalOpinion = `Projeto ${i} aprovado após análise técnica e jurídica detalhada. Atende a todos os requisitos.`
+    } else if (status === ProjectStatus.REJECTED) {
+      approvalOpinion = `Projeto ${i} rejeitado devido à falta de clareza nos objetivos e cronograma inviável.`
+    }
+
     const data = {
       slug: `teste-${i.toString().padStart(2, "0")}`,
       title: `Projeto de Pesquisa ${i.toString().padStart(2, "0")}`,
@@ -38,6 +49,13 @@ export async function seedDevProjects(prisma: PrismaClient) {
       userId: user.id,
       createdAt,
       submittedAt,
+      proposedInstrumentType,
+      approvalOpinion,
+      classificationAnswers: {
+        q1: "yes",
+        q2: "no",
+        details: `Specific answers for project ${i}`,
+      },
       legalInstrumentInstance: {
         create: {
           legalInstrumentVersionId: instrumentVersion.id,
@@ -46,11 +64,11 @@ export async function seedDevProjects(prisma: PrismaClient) {
         },
       },
     }
-    
+
     await prisma.project.upsert({
-      where: {slug: `teste-${i.toString().padStart(2, "0")}`},
+      where: { slug: `teste-${i.toString().padStart(2, "0")}` },
       create: data,
-      update: {slug: `teste-${i.toString().padStart(2, "0")}`}
+      update: { slug: `teste-${i.toString().padStart(2, "0")}` },
     })
   }
 
