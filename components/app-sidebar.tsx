@@ -16,11 +16,11 @@ import { useSession } from "next-auth/react"
 
 const data: Record<string, NavItem[]> = {
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: SquareTerminal,
-    },
+    // {
+    //   title: "Dashboard",
+    //   url: "/dashboard",
+    //   icon: SquareTerminal,
+    // },
     {
       title: "Gerenciamento",
       icon: Settings2,

@@ -53,7 +53,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
 
 export default function ProjectDetailsPage() {
   const router = useRouter()
-  const { project, dependences, loading, view } = useProject()
+  const { project, dependences, loading, view, refetch } = useProject()
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -86,9 +86,9 @@ export default function ProjectDetailsPage() {
 
   const hasWorkPlan = !!workPlan
   const hasLegalInstrument = !!legalInstrumentInstance
-  const hasPendingInstrument = hasLegalInstrument && (legalInstrumentInstance.status || LegalInstrumentStatus.PENDING) !== LegalInstrumentStatus.FILLED
+  const hasPendingInstrument = hasLegalInstrument && (legalInstrumentInstance?.status || LegalInstrumentStatus.PENDING) !== LegalInstrumentStatus.FILLED
 
-  const canSubmit = view?.allowActions && hasWorkPlan && hasLegalInstrument && !hasPendingInstrument && (project.status === ProjectStatus.DRAFT || (project.status as any) === "RETURNED")
+  const canSubmit = view?.allowActions && hasWorkPlan && hasLegalInstrument && !hasPendingInstrument && (project.status === ProjectStatus.DRAFT || project.status === "RETURNED")
 
   // Mensagem de feedback para botão desabilitado
   const getSubmitDisabledReason = () => {
@@ -103,8 +103,8 @@ export default function ProjectDetailsPage() {
     try {
       setIsSubmitting(true)
       await submitProjectForApproval(project.slug!)
+      refetch()
       notify.success("Projeto enviado para análise!")
-      router.refresh()
     } catch (error: unknown) {
       console.error(error)
       notify.error(getErrorMessage(error) ?? "Erro ao enviar projeto")
