@@ -23,7 +23,7 @@ npm run dev:setup
 
 Este comando irá automaticamente:
 
-1.  Subir os containers do Docker (Postgres, Minio).
+1.  Subir os containers do Docker (Postgres, Minio, Mailhog).
 2.  Aguardar a inicialização do banco de dados.
 3.  Rodar as migrações do Prisma.
 4.  Popular o banco com dados de teste (Seeds).

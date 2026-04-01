@@ -88,7 +88,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
                     <FileText className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="font-semibold text-base group-hover:text-primary">Inserir Plano de Negócio</h4>
+                    <h4 className="font-semibold text-base group-hover:text-primary">Inserir Plano de Trabalho</h4>
                     <p className="text-xs text-muted-foreground leading-relaxed px-1">Defina a estrutura, mercado e viabilidade do seu projeto.</p>
                   </div>
                 </div>
@@ -149,7 +149,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
                     <FileText className="w-8 h-8" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">Inserir Plano de Negócio</h3>
+                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">Inserir Plano de Trabalho</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed px-2">Defina a estrutura, mercado e viabilidade do seu projeto.</p>
                   </div>
                 </CardContent>

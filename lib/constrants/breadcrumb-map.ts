@@ -10,5 +10,5 @@ export const BREADCRUMB_MAP: Record<string, string> = {
   upload: "Upload",
   "legal-instrument": "Instrumento Jurídico",
   "legal-instruments": "Instrumentos Jurídicos",
-  "work-plan": "Plano de negócio",
+  "work-plan": "Plano de Trabalho",
 }
