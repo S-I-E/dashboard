@@ -15,11 +15,11 @@
     "docker:down": "docker compose -f infra/docker-compose.yml --profile dev --profile prod down",
     "docker:it:minio": "docker exec -it sie-minio /bin/bash",
     "prisma:generate": "prisma generate",
-    "prisma:dev:migrate": "npx prisma migrate dev",
-    "prisma:prod:migrate": "npx prisma migrate deploy",
+    "prisma:dev:migrate": "prisma migrate dev",
+    "prisma:prod:migrate": "prisma migrate deploy",
     "prisma:format": "npx prisma format",
-    "prisma:dev:seed": "SEED_ENV=dev npx prisma db seed",
-    "prisma:prod:seed": "SEED_ENV=prod npx prisma db seed"
+    "prisma:dev:seed": "SEED_ENV=dev prisma db seed",
+    "prisma:prod:seed": "SEED_ENV=prod prisma db seed"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.937.0",
@@ -81,5 +81,9 @@
     "tsx": "^4.20.6",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5"
+  }
+  ,
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
