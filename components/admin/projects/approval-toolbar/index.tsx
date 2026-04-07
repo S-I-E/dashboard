@@ -96,9 +96,8 @@ export function ProjectsApprovalToolbar() {
       missingLegalInstrument: localFilters.missingLegalInstrument ? "true" : null,
       dateStart: localFilters.dateStart || null,
       dateEnd: localFilters.dateEnd || null,
+      page: "1",
     }
-
-    console.log(`${pathname}?${createQueryString(params)}`)
 
     router.push(`${pathname}?${createQueryString(params)}`, { scroll: false })
     setOpen(false)
