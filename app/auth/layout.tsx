@@ -41,7 +41,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="max-w-md text-center animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-            <h1 className="mb-4 text-3xl font-bold tracking-tight drop-shadow-md">Sistema de Inovação e Empreendedorismo</h1>
+            <h1 className="mb-4 text-3xl font-bold tracking-tight drop-shadow-md">Secretaria de Inovação e Empreendedorismo</h1>
             <p className="text-lg text-white/90 font-light tracking-wide drop-shadow-sm">Universidade Federal de Rondonópolis</p>
           </div>
         </div>

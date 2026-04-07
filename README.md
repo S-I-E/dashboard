@@ -1,4 +1,4 @@
-# Sistema de Inovação Educacional (SIE)
+# Secretaria de Inovação Empreendedorismo (SIE)
 
 Sistema de gestão de projetos de inovação.
 

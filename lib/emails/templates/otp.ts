@@ -102,7 +102,7 @@ export const otpTemplate: EmailTemplate = {
       <div class="divider"></div>
       
       <div class="footer">
-        <p>© {{year}} SIE - Sistema de Informação e Extensão</p>
+        <p>© {{year}} SIE - Secretaria de informação e Empreendedorismo</p>
       </div>
     </div>
   </div>
