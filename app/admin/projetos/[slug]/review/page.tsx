@@ -131,7 +131,7 @@ export default function ProjectReviewPage() {
 
               {project.status === ProjectStatus.UNDER_REVIEW && (
                 <>
-                  <RejectProjectDialog slug={slug} />
+                  {/* <RejectProjectDialog slug={slug} /> */}
                   <ReturnProjectDialog slug={slug} />
                   <ApproveProjectDialog slug={slug} />
                 </>
