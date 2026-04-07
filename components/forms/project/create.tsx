@@ -14,6 +14,7 @@ import { z } from "zod"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import TextareaWithCounter from "@/components/ui/textarea-with-counter"
 import { notify } from "@/lib/notifications"
 
 const projectFormSchema = z.object({
@@ -199,7 +200,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
             <FormItem>
               <FormLabel>Título</FormLabel>
               <FormControl>
-                <Input placeholder="Ex.: Plataforma de Inovação SIE/UFR" {...field} />
+                <Input placeholder="Ex.: Plataforma de Inovação SIE/UFR" maxLength={200} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -213,7 +214,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
             <FormItem>
               <FormLabel>Objetivos</FormLabel>
               <FormControl>
-                <Textarea placeholder="Descreva os objetivos do projeto..." rows={6} {...field} />
+                <TextareaWithCounter placeholder="Descreva os objetivos do projeto..." rows={6} minLength={10} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -227,7 +228,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
             <FormItem>
               <FormLabel>Justificativa</FormLabel>
               <FormControl>
-                <Textarea placeholder="Explique a relevância pública/acadêmica, demanda atendida, etc." rows={6} {...field} />
+                <TextareaWithCounter placeholder="Explique a relevância pública/acadêmica, demanda atendida, etc." rows={6} minLength={10} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -241,7 +242,7 @@ export function ProjectForm({ initialProject, embedded = false }: ProjectFormPro
             <FormItem>
               <FormLabel>Abrangência</FormLabel>
               <FormControl>
-                <Textarea placeholder="Defina localidades, público-alvo e alcance..." rows={5} {...field} />
+                <TextareaWithCounter placeholder="Defina localidades, público-alvo e alcance..." rows={5} minLength={5} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
