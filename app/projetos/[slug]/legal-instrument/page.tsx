@@ -15,6 +15,7 @@ import LoadingOverlay from "@/components/ui/loading-overlay"
 export default function Page() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextParam = searchParams.get("next")
   const { project, loading, updateLegalInstrument } = useProject()
   const [saving, setSaving] = useState(false)
   const [mode, setMode] = useState<"start" | "wizard">("start")
@@ -34,7 +35,7 @@ export default function Page() {
           updateLegalInstrument(result.created)
         }
 
-        const next = searchParams.get("next")
+        const next = nextParam
         if (next) {
           router.push(`/projetos/${project.slug}/${next}`)
           return

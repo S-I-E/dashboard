@@ -74,10 +74,6 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
       onComplete({ type: partnershipType, history })
       const storageKey = `legalInstrumentWizard:${wizardId}`
       localStorage.removeItem(storageKey)
-      const url = new URL(window.location.href)
-      url.searchParams.delete("wizard")
-      url.searchParams.delete("state")
-      router.replace(url.pathname + url.search)
     }
   }
 
