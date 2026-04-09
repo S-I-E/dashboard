@@ -4,12 +4,14 @@ import { seedPermissions } from "./seeds/permissions"
 import { seedSystemDefaults } from "./seeds/system-defaults"
 import { seedDevTestUsers } from "./seeds/dev-test-users"
 import { seedDevProjects } from "./seeds/dev-projects"
+import { seedAdminUsers } from "./seeds/admin"
 
 const prisma = new PrismaClient({})
 
 const devSeeds = [
   seedLegalInstruments,
   seedPermissions,
+  seedAdminUsers,
   seedDevTestUsers,
   seedDevProjects,
   seedSystemDefaults, // alweys last
@@ -18,6 +20,7 @@ const devSeeds = [
 const prodSeeds = [
   seedLegalInstruments,
   seedPermissions,
+  seedAdminUsers,
   seedSystemDefaults, // alweys last
 ]
 
