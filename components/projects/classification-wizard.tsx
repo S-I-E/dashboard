@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useMachine } from "@xstate/react"
 import { createProjectFlowMachine } from "@/lib/constrants/project-flow-machine"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, RotateCcw, ArrowRight } from "lucide-react"
+import Modal from "@/components/ui/modal"
+import { CheckCircle2, RotateCcw, ArrowRight, CheckCircle, AlertCircle, MessageCircle, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LegalInstrumentType } from "@prisma/client"
 import type { ProjectClassificationAnswer, ProjectClassificationResult, ProjectClassificationSavedState } from "@/types/legal-instrument"
@@ -34,10 +35,16 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
   const [wizardId, setWizardId] = useState(() =>
     searchParams.get("wizard") ?? (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : String(Date.now()))
   )
+  const [isConsultDialogOpen, setIsConsultDialogOpen] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
 
   const machine = useMemo(() => createProjectFlowMachine(), [])
   const [state, send] = useMachine(machine)
   const [history, setHistory] = useState<ProjectClassificationAnswer[]>([])
+
+  const LEGAL_SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_LEGAL_SUPPORT_PHONE || "+55 11 99999-9999"
+  const WHATSAPP_PHONE = LEGAL_SUPPORT_WHATSAPP.replace(/\D/g, "")
+  const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}?text=Olá%2C%20gostaria%20de%20consultar%20sobre%20classificação%20de%20projeto.`
 
   const currentStateValue = state.value as string
   const isFinal = Object.keys(STATE_TO_PARTNERSHIP_TYPE).includes(currentStateValue)
@@ -45,7 +52,8 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
     | { meta?: { description?: string } }
     | undefined
   const description = currentStateNode?.meta?.description || "Responda para continuar..."
-
+  const isReviewScope = currentStateValue === "result_review_scope"
+  
   const handleAnswer = (answer: "YES" | "NO") => {
     setHistory((prev) => [...prev, { question: description, answer: answer === "YES" ? "Sim" : "Não" }])
     send({ type: answer === "YES" ? "ANSWER_YES" : "ANSWER_NO" })
@@ -74,6 +82,20 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
       onComplete({ type: partnershipType, history })
       const storageKey = `legalInstrumentWizard:${wizardId}`
       localStorage.removeItem(storageKey)
+    }
+  }
+
+  const handleConsult = () => {
+    setIsConsultDialogOpen(true)
+  }
+
+  const handleCopyPhone = async () => {
+    try {
+      await navigator.clipboard.writeText(LEGAL_SUPPORT_WHATSAPP)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    } catch (err) {
+      console.error("Erro ao copiar:", err)
     }
   }
 
@@ -140,14 +162,20 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
             <div className="w-full max-w-2xl space-y-8 text-center animate-in fade-in zoom-in duration-500">
               <div className="space-y-3">
                 <div className="inline-flex items-center justify-center p-3 rounded-full bg-primary/10 text-primary mb-2 ring-4 ring-primary/5">
-                  <CheckCircle2 className="w-8 h-8" />
+                  {isReviewScope ? <AlertCircle className="w-8 h-8" /> : <CheckCircle2 className="w-8 h-8" />}  
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Análise Concluída</h2>
-                <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">Identificamos o instrumento ideal para o seu projeto.</p>
+                {!isReviewScope && (
+                  <>
+                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Análise Concluída</h2>
+                    <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">Identificamos o instrumento ideal para o seu projeto.</p>
+                  </>
+                )}
               </div>
 
               <div className="bg-card border rounded-xl p-6 md:p-8 shadow-md transform transition-all hover:scale-[1.01] duration-300">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Instrumento Recomendado</h3>
+                {!isReviewScope && (
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Instrumento Recomendado</h3>
+                )}
                 <div className="text-xl md:text-3xl font-bold text-foreground mb-2 text-balance">{description}</div>
 
                 {currentStateValue === "result_review_scope" && (
@@ -160,12 +188,19 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Button variant="outline" onClick={handleReset} className="h-11 px-6 text-sm border hover:bg-muted">
                   <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                  Reiniciar
+                  {isReviewScope ? "Revisar o Escopo" : "Reiniciar"}
                 </Button>
-                <Button onClick={handleConfirm} size="lg" className="h-11 px-6 text-sm shadow-md hover:shadow-primary/25 transition-all">
-                  Confirmar e Continuar
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {isReviewScope ? (
+                  <Button onClick={handleConsult} size="lg" className="h-11 px-6 text-sm shadow-md hover:shadow-primary/25 transition-all">
+                    Consultar o Setor Jurídico
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button onClick={handleConfirm} size="lg" className="h-11 px-6 text-sm shadow-md hover:shadow-primary/25 transition-all">
+                    Confirmar e Continuar
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -228,6 +263,67 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
           </div>
         </div>
       </div>
+
+      <Modal
+        open={isConsultDialogOpen}
+        onOpenChange={setIsConsultDialogOpen}
+        title={
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-green-600" />
+            Consultar Setor Jurídico
+          </div>
+        }
+        className="sm:max-w-md"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsConsultDialogOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              onClick={() => {
+                window.open(WHATSAPP_URL, "_blank")
+                setIsConsultDialogOpen(false)
+              }}
+              className="gap-2 bg-green-600 hover:bg-green-700"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Abrir WhatsApp
+            </Button>
+          </div>
+        }
+      >
+        <div className="text-sm text-muted-foreground">Entre em contato com nosso setor jurídico via WhatsApp para tirar suas dúvidas</div>
+
+        <div className="space-y-4 py-4">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <p className="text-sm text-muted-foreground mb-3">Número de WhatsApp:</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-background border rounded px-3 py-2 font-mono text-sm font-semibold">
+                {LEGAL_SUPPORT_WHATSAPP}
+              </code>
+              <Button size="sm" variant="outline" onClick={handleCopyPhone} className="shrink-0">
+                {isCopied ? (
+                  <>
+                    <Check className="w-4 h-4 mr-1" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-1" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Descreva sua situação e deixe que nossos especialistas jurídicos ajudem a encontrar a melhor solução para seu projeto.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
