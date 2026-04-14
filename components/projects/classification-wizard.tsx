@@ -6,6 +6,7 @@ import { useMachine } from "@xstate/react"
 import { createProjectFlowMachine } from "@/lib/constrants/project-flow-machine"
 import { Button } from "@/components/ui/button"
 import Modal from "@/components/ui/modal"
+import { getLegalSupportWhatsApp } from "@/actions/system-defaults"
 import { CheckCircle2, RotateCcw, ArrowRight, CheckCircle, AlertCircle, MessageCircle, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LegalInstrumentType } from "@prisma/client"
@@ -42,8 +43,24 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
   const [state, send] = useMachine(machine)
   const [history, setHistory] = useState<ProjectClassificationAnswer[]>([])
 
-  const LEGAL_SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_LEGAL_SUPPORT_PHONE || "+55 11 99999-9999"
-  const WHATSAPP_PHONE = LEGAL_SUPPORT_WHATSAPP.replace(/\D/g, "")
+  const [legalSupportWhatsApp, setLegalSupportWhatsApp] = useState<string>(process.env.NEXT_PUBLIC_LEGAL_SUPPORT_PHONE || "+55 11 99999-9999")
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const value = await getLegalSupportWhatsApp()
+        if (mounted && value) setLegalSupportWhatsApp(value)
+      } catch (err) {
+        // ignore, keep fallback
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const WHATSAPP_PHONE = legalSupportWhatsApp.replace(/\D/g, "")
   const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}?text=Olá%2C%20gostaria%20de%20consultar%20sobre%20classificação%20de%20projeto.`
 
   const currentStateValue = state.value as string
@@ -299,7 +316,7 @@ export function ProjectClassificationWizard({ onComplete, initialState, onReset 
             <p className="text-sm text-muted-foreground mb-3">Número de WhatsApp:</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-background border rounded px-3 py-2 font-mono text-sm font-semibold">
-                {LEGAL_SUPPORT_WHATSAPP}
+                {legalSupportWhatsApp}
               </code>
               <Button size="sm" variant="outline" onClick={handleCopyPhone} className="shrink-0">
                 {isCopied ? (
