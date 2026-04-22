@@ -1,0 +1,40 @@
+{
+  "template": "modelo_3_plano_de_trabalho_acordo_de_parceria_para_pd_i_template.docx",
+  "fields": [
+    {
+      "id": "cargo",
+      "name": "cargo",
+      "type": "text",
+      "label": "Cargo",
+      "required": false
+    },
+    {
+      "id": "cnpj",
+      "name": "cnpj",
+      "type": "text",
+      "label": "Cnpj",
+      "required": false
+    },
+    {
+      "id": "cpf",
+      "name": "cpf",
+      "type": "text",
+      "label": "Cpf",
+      "required": false
+    },
+    {
+      "id": "endereco",
+      "name": "endereco",
+      "type": "text",
+      "label": "Endereco",
+      "required": false
+    },
+    {
+      "id": "representante_legal",
+      "name": "representante_legal",
+      "type": "text",
+      "label": "Representante legal",
+      "required": false
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-import { PrismaClient, LegalInstrumentType } from "@prisma/client"
-import { readFileSync } from "node:fs"
+import { PrismaClient, LegalInstrumentType, Prisma } from "@prisma/client"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 export async function seedLegalInstruments(prisma: PrismaClient) {
@@ -7,39 +7,8 @@ export async function seedLegalInstruments(prisma: PrismaClient) {
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? "http://localhost:3000"
 
-  const pdfPath = join(process.cwd(), "public", "test-files", "template.pdf")
-  const docxPath = join(process.cwd(), "public", "test-files", "template.docx")
-
-  const pdfSize = readFileSync(pdfPath).length
-  const docxSize = readFileSync(docxPath).length
-
-  let pdfFile = await prisma.file.findFirst({ where: { key: "local/test-files/template.pdf" } })
-  if (!pdfFile) {
-    pdfFile = await prisma.file.create({
-      data: {
-        key: "local/test-files/template.pdf",
-        url: `${baseUrl}/test-files/template.pdf`,
-        bucket: "local",
-        filename: "template.pdf",
-        contentType: "application/pdf",
-        size: pdfSize,
-      },
-    })
-  }
-
-  let docxFile = await prisma.file.findFirst({ where: { key: "local/test-files/template.docx" } })
-  if (!docxFile) {
-    docxFile = await prisma.file.create({
-      data: {
-        key: "local/test-files/template.docx",
-        url: `${baseUrl}/test-files/template.docx`,
-        bucket: "local",
-        filename: "template.docx",
-        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        size: docxSize,
-      },
-    })
-  }
+  const generatedDir = join(process.cwd(), "templates", "legal_instruments", "generated")
+  const fallbackDocxPath = join(process.cwd(), "public", "test-files", "template.docx")
 
   const defaultFieldsJson = [
     { id: "contract_party_name", name: "contract_party_name", type: "text", label: "Nome da parte contratante", required: true },
@@ -53,6 +22,73 @@ export async function seedLegalInstruments(prisma: PrismaClient) {
     { id: "installments", name: "installments", type: "number", label: "Quantidade de parcelas", required: false },
   ]
 
+  const templateByType: Record<LegalInstrumentType, string> = {
+    [LegalInstrumentType.PDI_AGREEMENT]: "modelo_de_acordo_com_aporte_de_recurso_template.docx",
+    [LegalInstrumentType.SERVICE_CONTRACT]: "modelo_contrato_servico_tecnico_apoio_template.docx",
+    [LegalInstrumentType.APPDI_PRIVATE]: "modelo_de_acordo_com_aporte_de_recurso_template.docx",
+    [LegalInstrumentType.APPDI_NO_FUNDING]: "modelo_de_acordo_sem_aporte_de_recurso_template.docx",
+    [LegalInstrumentType.COOP_AGREEMENT]: "modelo_anexo_ii_minuta_acordo_de_cooperacao_template.docx",
+    [LegalInstrumentType.NDA]: "modelo_2026_acordo_de_confidencialidade_nda_ufr_template.docx",
+    [LegalInstrumentType.TECH_TRANSFER]: "modelo_contrato_transferencia_patente_template.docx",
+    [LegalInstrumentType.REVIEW_SCOPE]: "modelo_checklist_para_acordo_de_parceria_template.docx",
+  }
+
+  async function ensureLocalTemplateFile(filename: string) {
+    const docxPath = existsSync(join(generatedDir, filename)) ? join(generatedDir, filename) : fallbackDocxPath
+    const key = `local/templates/legal_instruments/${filename}`
+    const existing = await prisma.file.findFirst({ where: { key } })
+    const size = statSync(docxPath).size
+
+    if (existing) {
+      return prisma.file.update({
+        where: { id: existing.id },
+        data: {
+          url: `${baseUrl}/templates/legal_instruments/generated/${encodeURIComponent(filename)}`,
+          filename,
+          contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          size,
+        },
+      })
+    }
+
+    return prisma.file.create({
+      data: {
+        key,
+        url: `${baseUrl}/templates/legal_instruments/generated/${encodeURIComponent(filename)}`,
+        bucket: "local",
+        filename,
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        size,
+      },
+    })
+  }
+
+  function readTemplateFields(filename: string) {
+    const jsonName = filename.replace(/\.docx$/i, ".json")
+    const jsonPath = join(generatedDir, jsonName)
+    const cleanJsonPath = join(generatedDir, 'clean', jsonName)
+    if (!existsSync(jsonPath)) return defaultFieldsJson
+
+    try {
+      const raw = readFileSync(jsonPath, "utf-8")
+      const parsed = JSON.parse(raw) as { fields?: unknown }
+      if (Array.isArray(parsed.fields) && parsed.fields.length > 0) return parsed.fields
+      // if generated JSON exists but has no fields, try clean folder JSON
+      if (existsSync(cleanJsonPath)) {
+        try {
+          const raw2 = readFileSync(cleanJsonPath, 'utf-8')
+          const parsed2 = JSON.parse(raw2) as { fields?: unknown }
+          if (Array.isArray(parsed2.fields) && parsed2.fields.length > 0) return parsed2.fields
+        } catch {
+          // ignore and fallback
+        }
+      }
+      return defaultFieldsJson
+    } catch {
+      return defaultFieldsJson
+    }
+  }
+
   const instruments = [
     { name: "PDI", description: "Convênio de PD&I", type: LegalInstrumentType.PDI_AGREEMENT },
     { name: "Contrato", description: "Contrato de Serviços Técnicos", type: LegalInstrumentType.SERVICE_CONTRACT },
@@ -65,22 +101,24 @@ export async function seedLegalInstruments(prisma: PrismaClient) {
   ]
 
   for (const instrument of instruments) {
-    const existing = await prisma.legalInstrument.findUnique({
+    const templateFilename = templateByType[instrument.type]
+    const file = await ensureLocalTemplateFile(templateFilename)
+    const fieldsJson = readTemplateFields(templateFilename)
+
+    await prisma.legalInstrument.upsert({
       where: { type: instrument.type },
-      select: { id: true },
-    })
-
-    if (existing) continue
-
-    const templateFileId = instrument.type === LegalInstrumentType.NDA ? docxFile.id : pdfFile.id
-
-    await prisma.legalInstrument.create({
-      data: {
+      create: {
         name: instrument.name,
         description: instrument.description,
         type: instrument.type,
-        fieldsJson: defaultFieldsJson as any,
-        templateFileId,
+        fieldsJson: fieldsJson as Prisma.InputJsonValue,
+        templateFileId: file.id,
+      },
+      update: {
+        name: instrument.name,
+        description: instrument.description,
+        fieldsJson: fieldsJson as Prisma.InputJsonValue,
+        templateFileId: file.id,
       },
     })
   }

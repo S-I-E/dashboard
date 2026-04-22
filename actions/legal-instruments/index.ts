@@ -134,12 +134,18 @@ export async function previewLegalInstrument(
 
   const sample = sampleValues || {}
   const fields = fieldsJson || ((li.fieldsJson as unknown) as LegalInstrumentFieldSpec[]) || []
-
   let preview = text
   for (const f of fields) {
-    const key = f.name
-    const val = sample[key] ?? `{${key}}`
-    preview = preview.split(`{${key}}`).join(String(val))
+    const nameKey = f.name
+    const idKey = f.id
+    const val = sample[nameKey] ?? sample[idKey] ?? `{${nameKey}}`
+    // support both {{name}} and {name} as used historically, and also fallback to id placeholders
+    preview = preview.split(`{{${nameKey}}}`).join(String(val))
+    preview = preview.split(`{${nameKey}}`).join(String(val))
+    if (idKey) {
+      preview = preview.split(`{{${idKey}}}`).join(String(val))
+      preview = preview.split(`{${idKey}}`).join(String(val))
+    }
   }
 
   return { preview }
@@ -208,9 +214,11 @@ export async function saveLegalInstrumentAnswers(
 
         // Replace placeholders
         for (const field of fields) {
-          const answerValue = answers[field.id]
+          const answerValue = answers[field.id] ?? answers[field.name]
           if (answerValue !== undefined && answerValue !== null) {
-            content = content.split(`{{${field.id}}}`).join(String(answerValue))
+            // prefer replacing by name placeholders ({{name}}), but keep id placeholders for backward compatibility
+            if (field.name) content = content.split(`{{${field.name}}}`).join(String(answerValue))
+            if (field.id) content = content.split(`{{${field.id}}}`).join(String(answerValue))
           }
         }
 
